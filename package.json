@@ -1,0 +1,9 @@
+{
+  "name": "terra-server",
+  "version": "0.0.1",
+  "description": "Express server for Inference with REST API",
+  "main": "index.js",
+  "repository": "https://github.com/codedotarchi/terra-server.git",
+  "author": "Noah Pitts <noahpitts@code.archi>",
+  "license": "GPL 3.0"
+}
