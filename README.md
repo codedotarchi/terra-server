@@ -4,13 +4,18 @@ Using NODE 10.15.3 LTS
 
 
 ## Packages
-npm install -g typescript
-npm install -g parcel-bundler
 
 npm install @tensorflow/tfjs
 npm install @tensorflow/tfjs-node
 npm install @tensorflow/tfjs-node-gpu
 npm install express
+
+
+
+npm install -D typescript
+npm install -D parcel-bundler
+npm install -D tslint
+npm install -D tslint-microsoft-contrib
 
 
 
