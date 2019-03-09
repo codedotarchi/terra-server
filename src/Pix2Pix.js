@@ -537,8 +537,13 @@ class Pix2Pix {
 }
 
 
-// main test
+
+//---------------
+// Main Test
+//---------------
+
 let p2p = new Pix2Pix([256, 256, 1], 32);
 
+// NN summary
 p2p.discriminator.summary();
 p2p.generator.summary();
