@@ -1,43 +1,57 @@
 let tf = require('@tensorflow/tfjs-node');
 
-console.log(tf.getBackend());
+
 
 class DataLoader() {
     // class DataLoader():
-    constructor(datasetPath, datasetName, datasetChannels, datasetNumSamples, train = true, imageShape = [256, 256, 3]) {
+    constructor(rootPath, params) {
 
-        // this.datasetMeta = datasetPath // TODO work on developing a datasets.json
+        // TODO: Error on no root location provided or set a default once server is up
+        this.rootPath = rootPath;
+        // defaultParams = {
+        //     location: 'yosemite',
+        //     patchSize: 256,
+        //     scale: 7,
+        //     dataset: 'train',
+        //     channels: [['topo_grid8'],
+        //                ['topo']],
+        //     numSamples: 400,
+        //     dataType: '.jpg'
+        // }
 
-        this.datasetPath = datasetPath;
-        this.datasetName = datasetName;
-        this.datasetType = (train) ?  'train' : 'test';
-        this.imageShape = imageShape;
-        this.datasetChannels = datasetChannels; // [[ch0, ch1, ch2, ch3...], [ch0, ch1, ch2...]
-        this.datasetNumSamples = datasetNumSamples; //TODO: validate that num samples is less than total samples
-        this.datasetExtension = '.jpg';
+        // DATSET SELECTION PARAMS
+        this.location = (params.location !== undefined) ? params.location : 'yosemite';
+        this.patchSize = (params.patchSize !== undefined) ? params.patchSize : 256;
+        this.scale = (params.scale !== undefined) ? params.scale : 7;
+        this.dataset = (params.dataset !== undefined) ? params.dataset : 'train';
+        this.channels = (params.channels !== undefined) ? params.channels : [['topo_grid8'], ['topo']];
+        this.numSamples = (params.numSamples !== undefined) ? params.numSamples : 400;
+        this.dataType = (params.dataType !== undefined) ? params.dataType : '.jpg';
+
+        this.datasetPath = this.rootPath + '/' + this.location + '/' + this.patchSize + '/' + this.scale + '/' + this.dataset + '/';
 
         // Construct Paths for Input A (Truth) and Input B (Representation)
         this.datasetPathsA = [];
         this.datasetPathsB = [];
 
-        for (let i = 1; i <= this.datasetNumSamples; i++) {
+        for (let i = 1; i <= this.this.numSamples; i++) {
 
             let inputChannelPathsA = [];
-            for (let channelNameA of this.datasetChannels[0]) {
-                inputChannelPathsA.push(this.datasetPath + '/' + this.datasetName + '/' + this.datasetType + '/' + channelNameA + '/' + i + this.datasetExtension);
+            for (let channelNameA of this.channels[0]) {
+                inputChannelPathsA.push(this.datasetPath + channelNameA + '/' + i + this.dataType);
             }
             this.datasetPathsA.push(inputChannelPathsA);
 
             let inputChannelPathsB = [];
-            for (let channelNameB of this.datasetChannels[0]) {
-                inputChannelPathsB.push(this.datasetPath + '/' + this.datasetName + '/' + this.datasetType + '/' + channelNameB + '/' + i + this.datasetExtension);
+            for (let channelNameB of this.channels[1]) {
+                inputChannelPathsB.push(this.datasetPath + channelNameB + '/' + i + this.dataType);
             }
             this.datasetPathsB.push(inputChannelPathsB);
         }
 
     }
 
-
+        // TODO ----------------------------------------------------------------------------------------------------
 
 
 
@@ -70,8 +84,8 @@ class DataLoader() {
     //  |           |---1.jpg                   (numbers should pair across all channels per name and type)
     //  |           |---2.jpg
     //  |           |---3.jpg
-    //  |---.scripts                            (python scripts for generating data patches)
-    //      |---genDataset.py                   (pyhton script)
+    //  .scripts                            (python scripts for generating data patches)
+    //  |---genDataset.py                   (pyhton script)
 
 
     loadData(batchSize) {
@@ -541,7 +555,7 @@ class Pix2Pix {
 //---------------
 // Main Test
 //---------------
-
+console.log(tf.getBackend());
 let p2p = new Pix2Pix([256, 256, 1], 32);
 
 // NN summary
