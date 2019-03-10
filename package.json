@@ -11,6 +11,7 @@
     "@tensorflow/tfjs-vis": "^1.0.0",
     "argparse": "^1.0.10",
     "express": "^4.16.4",
+    "jimp": "^0.6.0",
     "time-ago": "^0.2.1"
   },
   "devDependencies": {

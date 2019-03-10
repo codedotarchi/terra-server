@@ -1,8 +1,9 @@
 let tf = require('@tensorflow/tfjs-node');
+const Jimp = require('jimp');
 
 
 
-class DataLoader() {
+class DataLoader {
     // class DataLoader():
     constructor(rootPath, params) {
 
@@ -22,19 +23,22 @@ class DataLoader() {
         // DATSET SELECTION PARAMS
         this.location = (params.location !== undefined) ? params.location : 'yosemite';
         this.patchSize = (params.patchSize !== undefined) ? params.patchSize : 256;
-        this.scale = (params.scale !== undefined) ? params.scale : 7;
+        this.scale = (params.scale !== undefined) ? params.scale : 8;
         this.dataset = (params.dataset !== undefined) ? params.dataset : 'train';
-        this.channels = (params.channels !== undefined) ? params.channels : [['topo_grid8'], ['topo']];
+        this.channels = (params.channels !== undefined) ? params.channels : [['grid_8_bin'], ['topo']];
         this.numSamples = (params.numSamples !== undefined) ? params.numSamples : 400;
-        this.dataType = (params.dataType !== undefined) ? params.dataType : '.jpg';
+        this.dataType = (params.dataType !== undefined) ? params.dataType : '.png';
 
         this.datasetPath = this.rootPath + '/' + this.location + '/' + this.patchSize + '/' + this.scale + '/' + this.dataset + '/';
+
+        this.numChannelsA = this.channels[0].length;
+        this.numChannelsB = this.channels[1].length;
 
         // Construct Paths for Input A (Truth) and Input B (Representation)
         this.datasetPathsA = [];
         this.datasetPathsB = [];
 
-        for (let i = 1; i <= this.this.numSamples; i++) {
+        for (let i = 1; i <= this.numSamples; i++) {
 
             let inputChannelPathsA = [];
             for (let channelNameA of this.channels[0]) {
@@ -51,14 +55,46 @@ class DataLoader() {
 
     }
 
-        // TODO ----------------------------------------------------------------------------------------------------
+    async loadChannel(path) {
+        const image = await Jimp.read(path);
+        const imageArray = new Array(image.bitmap.width * image.bitmap.height);
+        const offset = 127.5;
+        for (let i = 0, j = 0; i < imageArray.length; i++) {
+            imageArray[i] = image.bitmap.data[j] / offset - 1.0;
+            j += 4
+        }
 
-
-
-    loadImage() {
-        // TODO Load images asyncrously....
+        return imageArray;
     }
 
+    async loadChannels(paths) {
+        // console.log(paths);
+        const numChannels = paths.length;
+        const images = []
+
+        // Get all of the image channels
+        for (let i = 0; i < numChannels; i++) {
+            images[i] = await Jimp.read(paths[i]);
+        }
+
+        // console.log(images);
+
+
+        const size = images[0].bitmap.width * images[0].bitmap.width;
+        const offset = 127.5; // ?? This is for 8-bit offset
+
+        // Normalize and interleave image channels
+        const channelArray = new Array(size * numChannels);
+        for (let i = 0; i < size; i++) {
+            for (let j = 0; j < numChannels; j++) {
+                channelArray[numChannels * i + j] = images[j].bitmap.data[i * 4] / offset - 1.0;
+            }
+        }
+
+        // console.log(channelArray);
+
+        return channelArray;
+    }
 
     //  DATASET PATH                            (root URL to Datasets)
     //  |---datasets.json                       (JSON describing dataset)
@@ -87,92 +123,31 @@ class DataLoader() {
     //  .scripts                            (python scripts for generating data patches)
     //  |---genDataset.py                   (pyhton script)
 
+    async loadBatch(batchSize = 1) {
 
-    loadData(batchSize) {
-        //     def load_data(self, batch_size=1, is_testing=False):
-        //         data_type = "train" if not is_testing else "test"
-        //         path = glob('./datasets/%s/%s/*' % (self.dataset_name, data_type))
+        let batchArrayA = [];
+        let batchArrayB = [];
 
-        //         batch_images = np.random.choice(path, size=batch_size)
-        let batchIndices = [];
-        for (let i = 0; i < batchSize; i++) {
-            batchIndices.push(Math.floor(Math.random() * this.datasetNumSamples));
-        }
-        
-        //         imgs_A = []
-        //         imgs_B = []
-        tensorsA = [];
-        tensorsB = [];
+        for (let b = 0; b < batchSize; b++) {
+            let index = Math.floor(Math.random() * this.numSamples);
+            let nextA = await this.loadChannels(this.datasetPathsA[index]);
+            let nextB = await this.loadChannels(this.datasetPathsB[index]);
 
-        for (let batchIndex of batchIndices) {
+            batchArrayA = batchArrayA.concat(nextA);
+            batchArrayB = batchArrayB.concat(nextB);
+
+            // console.log(batchArrayA.length);
 
         }
-        //         for img_path in batch_images:
-        //             img = self.imread(img_path)
 
-        //             h, w, _ = img.shape
-        //             _w = int(w/2)
-        //             img_A, img_B = img[:, :_w, :], img[:, _w:, :]
-
-        //             img_A = scipy.misc.imresize(img_A, self.img_res)
-        //             img_B = scipy.misc.imresize(img_B, self.img_res)
-
-        //             # If training => do random flip
-        //             if not is_testing and np.random.random() < 0.5:
-        //                 img_A = np.fliplr(img_A)
-        //                 img_B = np.fliplr(img_B)
-
-        //             imgs_A.append(img_A)
-        //             imgs_B.append(img_B)
-
-        //         imgs_A = np.array(imgs_A)/127.5 - 1.
-        //         imgs_B = np.array(imgs_B)/127.5 - 1.
-
-        //         return imgs_A, imgs_B
+        return [batchArrayA, batchArrayB];
     }
 
-    loadBatch() {
-        //     def load_batch(self, batch_size=1, is_testing=False):
-        //         data_type = "train" if not is_testing else "val"
-        //         path = glob('./datasets/%s/%s/*' % (self.dataset_name, data_type))
-
-        //         self.n_batches = int(len(path) / batch_size)
-
-        //         for i in range(self.n_batches-1):
-        //             batch = path[i*batch_size:(i+1)*batch_size]
-        //             imgs_A, imgs_B = [], []
-        //             for img in batch:
-        //                 img = self.imread(img)
-        //                 h, w, _ = img.shape
-        //                 half_w = int(w/2)
-        //                 img_A = img[:, :half_w, :]
-        //                 img_B = img[:, half_w:, :]
-
-        //                 img_A = scipy.misc.imresize(img_A, self.img_res)
-        //                 img_B = scipy.misc.imresize(img_B, self.img_res)
-
-        //                 if not is_testing and np.random.random() > 0.5:
-        //                         img_A = np.fliplr(img_A)
-        //                         img_B = np.fliplr(img_B)
-
-        //                 imgs_A.append(img_A)
-        //                 imgs_B.append(img_B)
-
-        //             imgs_A = np.array(imgs_A)/127.5 - 1.
-        //             imgs_B = np.array(imgs_B)/127.5 - 1.
-
-        //             yield imgs_A, imgs_B
-    }
-
-    imageRead() {
-        //     def imread(self, path):
-        //         return imageio.imread(path, pilmode='RGB').astype(np.float) #
-    }
 }
 
 // Pix2Pix Generator
 class Pix2Pix {
-    constructor(imageShape, numFilters) {
+    constructor(imageShape, numFilters, rootPath, params) {
         // # Input shape
         // self.img_rows = 256
         // self.img_cols = 256
@@ -186,14 +161,30 @@ class Pix2Pix {
         // # Configure data loader
         // self.dataset_name = 'facades'
         // self.data_loader = DataLoader(dataset_name = self.dataset_name,
+        this.dataLoader = new DataLoader(rootPath, params);
+        // defaultParams = {
+        //     location: 'yosemite',
+        //     patchSize: 256,
+        //     scale: 7,
+        //     dataset: 'train',
+        //     channels: [['topo_grid8'],
+        //                ['topo']],
+        //     numSamples: 400,
+        //     dataType: '.jpg'
+        // }
+
+
+
+
         // img_res = (self.img_rows, self.img_cols))
 
 
         // # Calculate output shape of D(PatchGAN)
         // patch = int(self.img_rows / 2 ** 4)
         // self.disc_patch = (patch, patch, 1)
-        const patch = Math.floor(this.imageRows / Math.pow(2, 4)); // What is this?
-        this.dis_patch = [patch, patch, 1];
+        // this.dPatch = Math.floor(this.imageRows / Math.pow(2, 4)); // ?? What is this?
+        this.dPatch = Math.floor(this.imageRows);
+
 
         // # Number of filters in the first layer of G and D
         // self.gf = 64
@@ -214,8 +205,12 @@ class Pix2Pix {
         //     optimizer = optimizer,
         //     metrics = ['accuracy'])
         this.discriminator = this.buildDiscriminator();
-        // this.discriminator.summary();
-
+        this.discriminator.compile({
+            optimizer: this.adam,
+            loss: 'meanSquaredError',
+            metrics: ['accuracy']
+        });
+        this.discriminator.summary();
         // #-------------------------
         // # Construct Computational
         // #   Graph of Generator
@@ -224,9 +219,6 @@ class Pix2Pix {
         // # Build the generator
         // self.generator = self.build_generator()
         this.generator = this.buildGenerator();
-
-        // 
-        // this.generator.summary();
 
         // # Input images and their conditioning images
         // img_A = Input(shape = self.img_shape)
@@ -237,24 +229,22 @@ class Pix2Pix {
         // # By conditioning on B generate a fake version of A
         // fake_A = self.generator(img_B)
         const fakeA = this.generator.apply(inputB); //????
-        // const fakeA = this.generator.getLayer('conv2d_Conv2D19');
 
         // # For the combined model we will only train the generator
         // self.discriminator.trainable = False
+        this.discriminator.trainable = false;
 
         // # Discriminators determines validity of translated images / condition pairs
         // valid = self.discriminator([fake_A, img_B])
-
-        // console.log(this.discriminator);
         const valid = this.discriminator.apply([fakeA, inputB]); //????
         // const valid = this.discriminator.getLayer('conv2d_Conv2D5');
 
         // self.combined = Model(inputs = [img_A, img_B], outputs = [valid, fake_A])
+        this.combined = tf.model({ inputs: [inputA, inputB], outputs: [valid, fakeA] });
+
         // self.combined.compile(loss = ['mse', 'mae'],
         //     loss_weights = [1, 100],
         //     optimizer = optimizer)
-        this.combined = tf.model({ inputs: [inputA, inputB], outputs: [valid, fakeA] });
-
         this.combined.summary();
         this.combined.compile({
             optimizer: this.adam,
@@ -262,12 +252,8 @@ class Pix2Pix {
             lossWeights: [1, 100]
         });
     }
-    loadData(imageList) {
-        // tf.losses.bina
 
-    }
-
-    buildGenerator(inputB) {
+    buildGenerator() {
         // def conv2d(layer_input, filters, f_size = 4, bn = True):
         // """Layers used during downsampling"""
         // d = Conv2D(filters, kernel_size = f_size, strides = 2, padding = 'same')(layer_input)
@@ -444,24 +430,79 @@ class Pix2Pix {
         return tf.model({ inputs: [input1, input2], outputs: output });
     }
 
+    async trainBatch(batchSize = 1) {
+        // start_time = datetime.datetime.now()
+        // let fakeA, dLossReal, dLossFake, dLoss, gLoss;
+        let batch = await this.dataLoader.loadBatch(batchSize);
+        let batchA = batch[0];
+        // console.log(batchA);
+        let batchB = batch[1];
+
+        // return tf.tidy(async () => {
+        const valid = tf.ones([batchSize, this.dPatch, this.dPatch, 1]);
+        const fake = tf.zeros([batchSize, this.dPatch, this.dPatch, 1]);
+
+        const shapeA = [batchSize, this.dataLoader.patchSize, this.dataLoader.patchSize, this.dataLoader.numChannelsA];
+        const shapeB = [batchSize, this.dataLoader.patchSize, this.dataLoader.patchSize, this.dataLoader.numChannelsB];
+        // console.log(shapeA);
+
+        // Input 4D Tensors
+        const inputA = tf.tensor4d(batchA, shapeA);
+        const inputB = tf.tensor4d(batchB, shapeB)
+
+        // Train Discriminator
+        // ---------------------
+
+        // Condition on B and generate a translated version
+        const fakeA = this.generator.predictOnBatch(inputB);
+        // console.log(inputA);
+        // console.log(fakeA);
+        // console.log(valid);
+        
+
+        // Train the discriminators(original images = real / generated = Fake)
+        const dLossReal = await this.discriminator.trainOnBatch([inputA, inputB], valid);
+        console.log(dLossReal);
+        
+        const dLossFake = await this.discriminator.trainOnBatch([fakeA, inputB], fake);
+        console.log(dLossFake);
+
+        const dLoss = 0.5 * tf.add(dLossReal, dLossFake); // TODO: FIX THIS
+        console.log(dLoss);
+
+        // Train Generator
+        // ---------------------
+
+        // Train the generators
+        const gLoss = await this.combined.trainOnBatch([inputA, inputB], [valid, inputA]);
+        console.log(gLoss);
+        
+
+        console.log('[D loss: ' + dLoss[0] + ', acc: ' + (100 * dLoss[1]) + '] [G loss: ' + gLoss[0] + ']');
+        // return {disLoss: dLoss, genLoss: gLoss}
+
+
+        // });
+    }
+
     async train(data, epochs, batchSize = 1, sampleInterval = 50) {
         // start_time = datetime.datetime.now()
         let fakeA, dLossReal, dLossFake, dLoss, gLoss;
+
         // # Adversarial loss ground truths
         // valid = np.ones((batch_size,) + self.disc_patch)
         // fake = np.zeros((batch_size,) + self.disc_patch)
-        const valid = tf.ones((batchSize) + this.dis_patch); //??
-        const fake = tf.zeros((batchSize) + this.dis_patch); //??
+        const valid = tf.ones([batchSize, this.dPatch, this.dPatch, 1]); //??
+        const fake = tf.zeros([batchSize, this.dPatch, this.dPatch, 1]); //??
 
 
         // for epoch in range(epochs):
         //     for batch_i, (imgs_A, imgs_B) in enumerate(self.data_loader.load_batch(batch_size)):
         for (let epoch in epochs) {
-            // ??
-            let i;
-            for (let imgPair of this.dataLoader.loadBatch(batchSize)) { // ?? Do in ImgPair.A and ImgPair.B
-                // TODO
-            }
+            let batch = await this.dataLoader.loadBatch(batchSize);
+
+            let batchA = batch[0];
+            let batchB = batch[1];
         }
 
         // # ---------------------
@@ -556,8 +597,30 @@ class Pix2Pix {
 // Main Test
 //---------------
 console.log(tf.getBackend());
-let p2p = new Pix2Pix([256, 256, 1], 32);
+
 
 // NN summary
-p2p.discriminator.summary();
-p2p.generator.summary();
+// ------------------
+const epochs = 1;
+const imageShape = [256, 256, 1];
+const numFilters = 32
+const rootPath = './img'
+
+const params = {
+    location: 'yosemite',
+    patchSize: 256,
+    scale: 8,
+    dataset: 'train',
+    channels: [['topo'], ['grid_8_bin']],
+    numSamples: 1000,
+    dataType: '.png'
+}
+
+let p2p = new Pix2Pix(imageShape, numFilters, rootPath, params);
+// p2p.discriminator.summary();
+// p2p.generator.summary();
+
+// console.log(p2p.dataLoader.datasetPathsA[0].length);
+for (let i = 0; i < epochs; i++) {
+    p2p.trainBatch(1);
+}
